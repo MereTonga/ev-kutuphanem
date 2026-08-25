@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import List
 
 import models
@@ -17,6 +18,7 @@ origins = [
     "http://localhost:3000", # Standart React portu
 ]
 
+# CORS ayarları
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,       # Hangi adreslerden istek gelebilir?
@@ -33,9 +35,25 @@ def get_db():
     finally:
         db.close()
 
-# Yeni Kitap Ekleme (POST)
+# -----------------------------------------
+# CREATE - Yeni Kitap Ekle
+# -----------------------------------------
 @app.post("/kitaplar", response_model=schemas.KitapResponse, status_code=status.HTTP_201_CREATED)
 def kitap_ekle(kitap: schemas.KitapCreate, db: Session = Depends(get_db)):
+    
+    # Aynı kitap ve yazarın zaten kayıtlı olup olmadığını kontrol et
+    mevcut_kitap = db.query(models.Kitap).filter(
+        models.Kitap.kitap_ad == kitap.kitap_ad,
+        models.Kitap.yazar_ad_soyad == kitap.yazar_ad_soyad
+    ).first()
+
+    # Eğer aynı kitap ve yazar zaten varsa, 409 Conflict hatası döndür
+    if mevcut_kitap:
+        raise HTTPException(
+            status_code=409,
+            detail="Bu kitap ve yazar zaten kayıtlı."
+        )
+    
     # 1. Pydantic şemasındaki veriyi SQLAlchemy modeline çeviriyoruz
     yeni_kitap = models.Kitap(
         kitap_ad=kitap.kitap_ad,
@@ -47,20 +65,30 @@ def kitap_ekle(kitap: schemas.KitapCreate, db: Session = Depends(get_db)):
     db.add(yeni_kitap)
     
     # 3. Değişiklikleri veritabanına kalıcı olarak kaydet
-    db.commit()
+    try:
+        db.commit()
+        # 4. Veritabanının ürettiği ID ve güncel verileri modele geri yükle
+        db.refresh(yeni_kitap)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu kitap ve yazar zaten kayıtlı."
+        )
     
-    # 4. Veritabanının ürettiği ID ve güncel verileri modele geri yükle
-    db.refresh(yeni_kitap)
     
     return yeni_kitap
 
-# Kitapları Listeleme (GET)
+# -----------------------------------------
+# READ - Kitapları Listele
+# -----------------------------------------
 @app.get("/kitaplar", response_model=List[schemas.KitapResponse])
 def kitaplari_getir(db: Session = Depends(get_db)):
-    kitaplar = db.query(models.Kitap).all()
-    return kitaplar
+    return db.query(models.Kitap).all()
 
-# Kitap Silme (DELETE)
+# -----------------------------------------
+# DELETE - Kitap Sil
+# -----------------------------------------
 @app.delete("/kitaplar/{kitap_id}", status_code=status.HTTP_204_NO_CONTENT)
 def kitap_sil(kitap_id: int, db: Session = Depends(get_db)):
     kitap = db.query(models.Kitap).filter(models.Kitap.id == kitap_id).first()
@@ -73,7 +101,9 @@ def kitap_sil(kitap_id: int, db: Session = Depends(get_db)):
     
     return None
 
-# Kitabı Güncelleme (PUT)
+# -----------------------------------------
+# UPDATE - Kitap Güncelle
+# -----------------------------------------
 @app.put("/kitaplar/{kitap_id}", response_model=schemas.KitapResponse)
 def kitap_guncelle(kitap_id: int, guncel_bilgiler: schemas.KitapCreate, db: Session = Depends(get_db)):
     kitap = db.query(models.Kitap).filter(models.Kitap.id == kitap_id).first()
@@ -84,11 +114,35 @@ def kitap_guncelle(kitap_id: int, guncel_bilgiler: schemas.KitapCreate, db: Sess
             detail="Güncellenmek istenen kitap bulunamadı."
         )
     
+    # Güncellenmek istenen kitap+yazar kombinasyonu başka bir kayıtta var mı?
+    mevcut_kitap = db.query(models.Kitap).filter(
+        models.Kitap.kitap_ad == guncel_bilgiler.kitap_ad,
+        models.Kitap.yazar_ad_soyad == guncel_bilgiler.yazar_ad_soyad,
+        models.Kitap.id != kitap_id
+    ).first()
+    
+    # Eğer aynı kitap ve yazar başka bir kayıtta varsa, 409 Conflict hatası döndür
+    if mevcut_kitap:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu kitap ve yazar zaten başka bir kayıtta mevcut."
+        )
+    
     # Alanları yeni gelen bilgilerle güncelle
     kitap.kitap_ad = guncel_bilgiler.kitap_ad
     kitap.yazar_ad_soyad = guncel_bilgiler.yazar_ad_soyad
     kitap.okundu_mu = guncel_bilgiler.okundu_mu
     
-    db.commit()
-    db.refresh(kitap)
+    try:
+        db.commit()
+        db.refresh(kitap)
+
+    except IntegrityError:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu kitap ve yazar zaten kayıtlı."
+        )
+
     return kitap

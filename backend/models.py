@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, UniqueConstraint
 from database import Base
 
 class Kitap(Base):
@@ -9,3 +9,11 @@ class Kitap(Base):
     kitap_ad = Column(String, nullable=False)
     yazar_ad_soyad = Column(String, nullable=False)
     okundu_mu = Column(Boolean, default=False)
+    
+    __table_args__ = (
+        UniqueConstraint(
+            "kitap_ad",
+            "yazar_ad_soyad",
+            name="uq_kitap_yazar"
+        ),
+    )

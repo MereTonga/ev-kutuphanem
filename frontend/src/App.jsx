@@ -99,7 +99,7 @@ function App() {
   };
 
   return (
-    <div style={{ ...styles.windowContainer, width: secilenId ? "1300px" : "950px" }}>
+    <div style={{ ...styles.windowContainer, width: secilenId ? "1600px" : "1200px" }}>
       <div style={styles.titleBar}>
         <span>📚 Kütüphanem</span>
       </div>
@@ -217,9 +217,10 @@ function App() {
 
 const styles = {
   windowContainer: {
+    height: "700px",
     margin: "30px auto",
-    border: "1px solid #999",
-    borderRadius: "4px",
+    border: "2px solid #999",
+    borderRadius: "1px",
     backgroundColor: "#f0f0f0",
     boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
     fontFamily: "Segoe UI, sans-serif",
@@ -228,9 +229,9 @@ const styles = {
   titleBar: {
     backgroundColor: "#ffffff",
     padding: "8px 12px",
-    borderBottom: "1px solid #ddd",
+    borderBottom: "2px solid #ddd",
     fontWeight: "bold",
-    fontSize: "14px",
+    fontSize: "16px",
   },
   content: {
     display: "flex",
@@ -247,7 +248,7 @@ const styles = {
     flex: "1.4",
   },
   formGroup: {
-    marginBottom: "15px",
+    marginBottom: "35px",
   },
   label: {
     display: "block",
@@ -290,15 +291,15 @@ const styles = {
   },
   counterText: {
     fontSize: "24px",
-    marginTop: "15px",
+    marginTop: "125px",
     color: "#111",
   },
   listBox: {
-    height: "440px",
+    height: "600px",
     border: "1px solid #7a7a7a",
     backgroundColor: "#ffffff",
     overflowY: "scroll",
-    padding: "2px",
+    padding: "1px",
   },
   listItem: {
     padding: "12px 14px",
