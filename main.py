@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, status, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -10,6 +11,19 @@ from database import engine, SessionLocal
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Kütüphane API")
+
+origins = [
+    "http://localhost:5173", # Vite kullanırsak
+    "http://localhost:3000", # Standart React portu
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,       # Hangi adreslerden istek gelebilir?
+    allow_credentials=True,      # Çerez/kimlik bilgisi kabul edilsin mi?
+    allow_methods=["*"],         # Hangi HTTP metodlarına izin verilsin? (GET, POST, PUT, DELETE vb. hepsi)
+    allow_headers=["*"],         # Hangi başlıklara (headers) izin verilsin?
+)
 
 # Her istek için oturum açıp kapatan bağımlılık fonksiyonu
 def get_db():
