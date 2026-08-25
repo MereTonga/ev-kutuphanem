@@ -3,15 +3,18 @@ import { useState, useEffect } from "react";
 function App() {
   const [kitaplar, setKitaplar] = useState([]);
   
-  // Form durumları
+  // 📥 Sol Panel: Ekleme form state'leri
   const [kitapAd, setKitapAd] = useState("");
   const [yazarAdSoyad, setYazarAdSoyad] = useState("");
   const [okunduMu, setOkunduMu] = useState(false);
   
-  // Listeden seçilen kitabın ID'si
+  // 🎯 Seçili Kitap ve Sağ Panel: Güncelleme state'leri
   const [secilenId, setSecilenId] = useState(null);
+  const [guncelKitapAd, setGuncelKitapAd] = useState("");
+  const [guncelYazarAdSoyad, setGuncelYazarAdSoyad] = useState("");
+  const [guncelOkunduMu, setGuncelOkunduMu] = useState(false);
 
-  // Kitapları Getir
+  // 🔄 Kitapları Getir
   const kitaplariGetir = () => {
     fetch("http://localhost:8000/kitaplar")
       .then((res) => res.json())
@@ -23,21 +26,27 @@ function App() {
     kitaplariGetir();
   }, []);
 
-  // Yeni Kitap Ekle
+  // 📋 Listeden Kitap Seçme
+  const kitapSec = (kitap) => {
+    setSecilenId(kitap.id);
+    setGuncelKitapAd(kitap.kitap_ad);
+    setGuncelYazarAdSoyad(kitap.yazar_ad_soyad);
+    setGuncelOkunduMu(kitap.okundu_mu);
+  };
+
+  // ➕ Kitap Ekle
   const kitapEkle = (e) => {
     e.preventDefault();
     if (!kitapAd.trim() || !yazarAdSoyad.trim()) return;
 
-    const yeniKitap = {
-      kitap_ad: kitapAd,
-      yazar_ad_soyad: yazarAdSoyad,
-      okundu_mu: okunduMu,
-    };
-
     fetch("http://localhost:8000/kitaplar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(yeniKitap),
+      body: JSON.stringify({
+        kitap_ad: kitapAd,
+        yazar_ad_soyad: yazarAdSoyad,
+        okundu_mu: okunduMu,
+      }),
     })
       .then((res) => res.json())
       .then(() => {
@@ -49,10 +58,31 @@ function App() {
       .catch((err) => console.error("Ekleme hatası:", err));
   };
 
-  // Seçilen Kitabı Sil
+  // ✏️ Kitap Güncelle (PUT)
+  const kitapGuncelle = (e) => {
+    e.preventDefault();
+    if (!secilenId) return;
+
+    fetch(`http://localhost:8000/kitaplar/${secilenId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kitap_ad: guncelKitapAd,
+        yazar_ad_soyad: guncelYazarAdSoyad,
+        okundu_mu: guncelOkunduMu,
+      }),
+    })
+      .then((res) => res.json())
+      .then(() => {
+        kitaplariGetir();
+      })
+      .catch((err) => console.error("Güncelleme hatası:", err));
+  };
+
+  // 🗑️ Kitap Sil
   const kitapSil = () => {
     if (!secilenId) {
-      alert("Lütfen önce sağdaki listeden silmek istediğiniz kitabı seçin!");
+      alert("Lütfen önce listeden bir kitap seçin!");
       return;
     }
 
@@ -69,16 +99,14 @@ function App() {
   };
 
   return (
-    <div style={styles.windowContainer}>
-      {/* 🪟 Pencere Başlık Çubuğu */}
+    <div style={{ ...styles.windowContainer, width: secilenId ? "1300px" : "950px" }}>
       <div style={styles.titleBar}>
         <span>📚 Kütüphanem</span>
       </div>
 
-      {/* 📦 Ana İçerik (İki Panel) */}
       <div style={styles.content}>
-        {/* 📐 Sol Panel */}
-        <div style={styles.leftPanel}>
+        {/* 📐 1. Panel: Ekleme Formu */}
+        <div style={styles.panel}>
           <form onSubmit={kitapEkle}>
             <div style={styles.formGroup}>
               <label style={styles.label}>Kitap İsmi</label>
@@ -90,7 +118,6 @@ function App() {
                 required
               />
             </div>
-
             <div style={styles.formGroup}>
               <label style={styles.label}>Yazar İsmi</label>
               <input
@@ -101,7 +128,6 @@ function App() {
                 required
               />
             </div>
-
             <div style={styles.formGroup}>
               <label style={styles.label}>Durum</label>
               <select
@@ -113,29 +139,23 @@ function App() {
                 <option value="true">Okundu</option>
               </select>
             </div>
-
-            {/* 🔘 Butonlar */}
             <div style={styles.buttonGroup}>
               <button type="submit" style={styles.button}>Ekle</button>
               <button type="button" onClick={kitapSil} style={styles.button}>Sil</button>
             </div>
           </form>
-
-          {/* 🔢 Kitap Sayısı */}
-          <div style={styles.counterText}>
-            Kitap Sayısı: {kitaplar.length}
-          </div>
+          <div style={styles.counterText}>Kitap Sayısı: {kitaplar.length}</div>
         </div>
 
-        {/* 📜 Sağ Panel (Liste Kutusu) */}
-        <div style={styles.rightPanel}>
+        {/* 📜 2. Panel: Kitap Listesi */}
+        <div style={styles.listPanel}>
           <div style={styles.listBox}>
             {kitaplar.map((kitap) => {
               const isSelected = secilenId === kitap.id;
               return (
                 <div
                   key={kitap.id}
-                  onClick={() => setSecilenId(kitap.id)}
+                  onClick={() => kitapSec(kitap)}
                   style={{
                     ...styles.listItem,
                     backgroundColor: isSelected ? "#0078d7" : "transparent",
@@ -148,21 +168,62 @@ function App() {
             })}
           </div>
         </div>
+
+        {/* ✏️ 3. Panel: Güncelleme Paneli (Yalnızca seçim varsa görünür) */}
+        {secilenId && (
+          <div style={{ ...styles.panel, borderLeft: "1px solid #ccc", paddingLeft: "20px" }}>
+            <form onSubmit={kitapGuncelle}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Kitap İsmi</label>
+                <input
+                  type="text"
+                  value={guncelKitapAd}
+                  onChange={(e) => setGuncelKitapAd(e.target.value)}
+                  style={styles.input}
+                  required
+                />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Yazar İsmi</label>
+                <input
+                  type="text"
+                  value={guncelYazarAdSoyad}
+                  onChange={(e) => setGuncelYazarAdSoyad(e.target.value)}
+                  style={styles.input}
+                  required
+                />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Durum</label>
+                <select
+                  value={guncelOkunduMu ? "true" : "false"}
+                  onChange={(e) => setGuncelOkunduMu(e.target.value === "true")}
+                  style={styles.select}
+                >
+                  <option value="false">Okunmadı</option>
+                  <option value="true">Okundu</option>
+                </select>
+              </div>
+              <div style={styles.buttonGroup}>
+                <button type="submit" style={styles.button}>Güncelle</button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// 🎨 Görseldeki Düzeni Sağlayan Stiller
 const styles = {
   windowContainer: {
-    width: "800px",
     margin: "30px auto",
     border: "1px solid #999",
     borderRadius: "4px",
     backgroundColor: "#f0f0f0",
     boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
     fontFamily: "Segoe UI, sans-serif",
+    transition: "width 0.2s ease",
   },
   titleBar: {
     backgroundColor: "#ffffff",
@@ -174,28 +235,30 @@ const styles = {
   content: {
     display: "flex",
     padding: "20px",
-    gap: "25px",
+    gap: "20px",
   },
-  leftPanel: {
+  panel: {
     flex: "1",
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
+  },
+  listPanel: {
+    flex: "1.4",
   },
   formGroup: {
     marginBottom: "15px",
   },
   label: {
     display: "block",
-    fontSize: "20px",
-    marginBottom: "6px",
+    fontSize: "22px",
+    marginBottom: "8px",
     color: "#222",
   },
-// App.jsx içindeki stiller kısmında şu alanları güncelleyebilirsin:
   input: {
     width: "100%",
-    padding: "6px 8px",
-    fontSize: "15px",
+    padding: "12px 14px",
+    fontSize: "20px",
     border: "1px solid #7a7a7a",
     backgroundColor: "#ffffff",
     color: "#000000",
@@ -203,47 +266,43 @@ const styles = {
   },
   select: {
     width: "100%",
-    padding: "6px 8px",
-    fontSize: "15px",
+    padding: "12px 14px",
+    fontSize: "22px",
     border: "1px solid #7a7a7a",
     backgroundColor: "#ffffff",
     color: "#000000",
     boxSizing: "border-box",
   },
+  buttonGroup: {
+    display: "flex",
+    gap: "10px",
+    marginTop: "10px",
+  },
   button: {
     flex: "1",
-    padding: "8px 0",
-    fontSize: "16px",
+    padding: "12px 0",
+    fontSize: "22px",
     cursor: "pointer",
     backgroundColor: "#e1e1e1",
     color: "#000000",
     border: "1px solid #7a7a7a",
     borderRadius: "2px",
   },
-  buttonGroup: {
-    display: "flex",
-    gap: "15px",
-    marginTop: "10px",
-    marginBottom: "20px",
-  },
   counterText: {
-    fontSize: "22px",
+    fontSize: "24px",
     marginTop: "15px",
     color: "#111",
   },
-  rightPanel: {
-    flex: "1.6",
-  },
   listBox: {
-    height: "360px",
+    height: "440px",
     border: "1px solid #7a7a7a",
     backgroundColor: "#ffffff",
     overflowY: "scroll",
     padding: "2px",
   },
   listItem: {
-    padding: "4px 8px",
-    fontSize: "15px",
+    padding: "12px 14px",
+    fontSize: "22px",
     cursor: "pointer",
     whiteSpace: "nowrap",
     overflow: "hidden",
