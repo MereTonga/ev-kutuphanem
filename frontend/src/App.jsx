@@ -1,22 +1,27 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import "./App.css";
+
+const metniNormallestir = (deger) => deger.toLocaleLowerCase("tr-TR").trim();
 
 function App() {
   const [kitaplar, setKitaplar] = useState([]);
-  const [hoveredButton, setHoveredButton] = useState(null);
-  const [pressedButton, setPressedButton] = useState(null);
-  
-  // 📥 Sol Panel: Ekleme form state'leri
+  const [aramaMetni, setAramaMetni] = useState("");
+  const [durumFiltresi, setDurumFiltresi] = useState("hepsi");
+  const [yazarFiltresi, setYazarFiltresi] = useState("hepsi");
+  const [siralama, setSiralama] = useState("yazar-az");
+
+  // Sol Panel: Ekleme form state'leri
   const [kitapAd, setKitapAd] = useState("");
   const [yazarAdSoyad, setYazarAdSoyad] = useState("");
   const [okunduMu, setOkunduMu] = useState(false);
-  
-  // 🎯 Seçili Kitap ve Sağ Panel: Güncelleme state'leri
+
+  // Secili kitap ve Sag Panel: Guncelleme state'leri
   const [secilenId, setSecilenId] = useState(null);
   const [guncelKitapAd, setGuncelKitapAd] = useState("");
   const [guncelYazarAdSoyad, setGuncelYazarAdSoyad] = useState("");
   const [guncelOkunduMu, setGuncelOkunduMu] = useState(false);
 
-  // 🔄 Kitapları Getir
+  // Kitaplari getir
   const kitaplariGetir = () => {
     fetch("http://localhost:8000/kitaplar")
       .then((res) => res.json())
@@ -36,7 +41,7 @@ function App() {
     setGuncelOkunduMu(kitap.okundu_mu);
   };
 
-  // ➕ Kitap Ekle
+  // Kitap ekle
   const kitapEkle = (e) => {
     e.preventDefault();
     if (!kitapAd.trim() || !yazarAdSoyad.trim()) return;
@@ -60,7 +65,7 @@ function App() {
       .catch((err) => console.error("Ekleme hatası:", err));
   };
 
-  // ✏️ Kitap Güncelle (PUT)
+  // Kitap guncelle
   const kitapGuncelle = (e) => {
     e.preventDefault();
     if (!secilenId) return;
@@ -81,7 +86,7 @@ function App() {
       .catch((err) => console.error("Güncelleme hatası:", err));
   };
 
-  // 🗑️ Kitap Sil
+  // Kitap sil
   const kitapSil = () => {
     if (!secilenId) {
       alert("Lütfen önce listeden bir kitap seçin!");
@@ -100,301 +105,276 @@ function App() {
       .catch((err) => console.error("Silme hatası:", err));
   };
 
-  const getButtonStyle = (buttonKey) => {
-    const isHovered = hoveredButton === buttonKey;
-    const isPressed = pressedButton === buttonKey;
-
-    return {
-      ...styles.button,
-      background: isPressed
-        ? "linear-gradient(180deg, #d6d6d6 0%, #c4c4c4 100%)"
-        : isHovered
-        ? "linear-gradient(180deg, #ffffff 0%, #e8eefc 100%)"
-        : "linear-gradient(180deg, #f8f8f8 0%, #e1e1e1 100%)",
-      borderColor: isHovered ? "#3a78d0" : "#7a7a7a",
-      boxShadow: isPressed
-        ? "inset 0 2px 4px rgba(0,0,0,0.18)"
-        : isHovered
-        ? "0 6px 14px rgba(58, 120, 208, 0.25)"
-        : "0 2px 4px rgba(0,0,0,0.08)",
-      transform: isPressed ? "translateY(1px) scale(0.99)" : isHovered ? "translateY(-1px)" : "none",
-    };
+  const kitaplariIndir = () => {
+    const blob = new Blob([JSON.stringify(kitaplar, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const downloadAnchorNode = document.createElement("a");
+    downloadAnchorNode.setAttribute("href", url);
+    downloadAnchorNode.setAttribute("download", "kitaplar.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+    URL.revokeObjectURL(url);
   };
 
-  return (
-    <div style={{ ...styles.windowContainer, width: secilenId ? "1750px" : "1300px" }}>
-      <div style={styles.titleBar}>
-        <span>📚 Kütüphanem</span>
-      </div>
+  const okunanSayisi = kitaplar.filter((kitap) => kitap.okundu_mu).length;
+  const okunmayanSayisi = kitaplar.length - okunanSayisi;
 
-      <div style={styles.content}>
-        {/* 📐 1. Panel: Ekleme Formu */}
-        <div style={styles.panel}>
+  const yazarlar = useMemo(() => {
+    return [...new Set(kitaplar.map((kitap) => kitap.yazar_ad_soyad.trim()).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, "tr-TR")
+    );
+  }, [kitaplar]);
+
+  const filtrelenmisKitaplar = useMemo(() => {
+    let sonuc = [...kitaplar];
+
+    if (aramaMetni.trim()) {
+      const arama = metniNormallestir(aramaMetni);
+      sonuc = sonuc.filter((kitap) => {
+        const kitapAdi = metniNormallestir(kitap.kitap_ad);
+        const yazarAdi = metniNormallestir(kitap.yazar_ad_soyad);
+        return kitapAdi.includes(arama) || yazarAdi.includes(arama);
+      });
+    }
+
+    if (durumFiltresi === "okundu") {
+      sonuc = sonuc.filter((kitap) => kitap.okundu_mu);
+    } else if (durumFiltresi === "okunmadı") {
+      sonuc = sonuc.filter((kitap) => !kitap.okundu_mu);
+    }
+
+    if (yazarFiltresi !== "hepsi") {
+      sonuc = sonuc.filter((kitap) => kitap.yazar_ad_soyad === yazarFiltresi);
+    }
+
+    sonuc.sort((a, b) => {
+      if (siralama === "yazar-az") {
+        return a.yazar_ad_soyad.localeCompare(b.yazar_ad_soyad, "tr-TR");
+      }
+      if (siralama === "yazar-za") {
+        return b.yazar_ad_soyad.localeCompare(a.yazar_ad_soyad, "tr-TR");
+      }
+      if (siralama === "kitap-az") {
+        return a.kitap_ad.localeCompare(b.kitap_ad, "tr-TR");
+      }
+      if (siralama === "kitap-za") {
+        return b.kitap_ad.localeCompare(a.kitap_ad, "tr-TR");
+      }
+      return 0;
+    });
+
+    return sonuc;
+  }, [aramaMetni, durumFiltresi, yazarFiltresi, siralama, kitaplar]);
+
+  const azSonucDekoruGoster = filtrelenmisKitaplar.length > 0 && filtrelenmisKitaplar.length <= 3;
+
+  return (
+    <div className="library-shell">
+      <div className="library-background" aria-hidden="true" />
+
+      <header className="library-header">
+        <div>
+          <p className="eyebrow">Personal Collection</p>
+          <h1>Kütüphanem</h1>
+        </div>
+        <div className="header-stats">
+          <span className="chip chip-total">Toplam {kitaplar.length}</span>
+          <span className="chip chip-read">Okundu {okunanSayisi}</span>
+          <span className="chip chip-unread">Okunmadı {okunmayanSayisi}</span>
+          <span className="chip chip-filter">Görünen {filtrelenmisKitaplar.length}</span>
+        </div>
+      </header>
+
+      <div className={`library-grid ${secilenId ? "has-selection" : ""}`}>
+        <section className="card form-card">
+          <h2>Yeni Kitap Ekle</h2>
           <form onSubmit={kitapEkle}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Kitap İsmi</label>
+            <div className="form-group">
+              <label className="label">Kitap İsmi</label>
               <input
                 type="text"
                 value={kitapAd}
                 onChange={(e) => setKitapAd(e.target.value)}
-                style={styles.input}
+                className="control"
                 required
               />
             </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Yazar İsmi</label>
+            <div className="form-group">
+              <label className="label">Yazar İsmi</label>
               <input
                 type="text"
                 value={yazarAdSoyad}
                 onChange={(e) => setYazarAdSoyad(e.target.value)}
-                style={styles.input}
+                className="control"
                 required
               />
             </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Durum</label>
+            <div className="form-group">
+              <label className="label">Durum</label>
               <select
                 value={okunduMu ? "true" : "false"}
                 onChange={(e) => setOkunduMu(e.target.value === "true")}
-                style={styles.select}
+                className="control"
               >
                 <option value="false">Okunmadı</option>
                 <option value="true">Okundu</option>
               </select>
             </div>
-            <div style={styles.buttonGroup}>
-              <button
-                type="submit"
-                style={getButtonStyle("ekle")}
-                onMouseEnter={() => setHoveredButton("ekle")}
-                onMouseLeave={() => {
-                  setHoveredButton(null);
-                  setPressedButton(null);
-                }}
-                onMouseDown={() => setPressedButton("ekle")}
-                onMouseUp={() => setPressedButton(null)}
-              >
+            <div className="button-group">
+              <button type="submit" className="btn btn-primary">
                 Ekle
               </button>
-              <button
-                type="button"
-                onClick={kitapSil}
-                style={getButtonStyle("sil")}
-                onMouseEnter={() => setHoveredButton("sil")}
-                onMouseLeave={() => {
-                  setHoveredButton(null);
-                  setPressedButton(null);
-                }}
-                onMouseDown={() => setPressedButton("sil")}
-                onMouseUp={() => setPressedButton(null)}
-              >
+              <button type="button" onClick={kitapSil} className="btn btn-danger">
                 Sil
               </button>
-              <button
-                type="button"
-                style={getButtonStyle("indir")}
-                onMouseEnter={() => setHoveredButton("indir")}
-                onMouseLeave={() => {
-                  setHoveredButton(null);
-                  setPressedButton(null);
-                }}
-                onMouseDown={() => setPressedButton("indir")}
-                onMouseUp={() => setPressedButton(null)}
-                onClick={() => {
-                  const dataStr =
-                    "data:text/json;charset=utf-8," +
-                    encodeURIComponent(JSON.stringify(kitaplar, null, 2));
-                  const downloadAnchorNode = document.createElement("a");
-                  downloadAnchorNode.setAttribute("href", dataStr);
-                  downloadAnchorNode.setAttribute("download", "kitaplar.json");
-                  document.body.appendChild(downloadAnchorNode);
-                  downloadAnchorNode.click();
-                  downloadAnchorNode.remove();
-                }}
-              >
+              <button type="button" className="btn btn-secondary" onClick={kitaplariIndir}>
                 Listeyi İndir
               </button>
             </div>
           </form>
-          <div style={styles.counterText}>Kitap Sayısı: {kitaplar.length}</div>
-        </div>
+          <p className="counter">Kitap Sayısı: {kitaplar.length}</p>
+        </section>
 
-        {/* 📜 2. Panel: Kitap Listesi */}
-        <div style={styles.listPanel}>
-          <div style={styles.listBox}>
-            {kitaplar.map((kitap) => {
+        <section className="card list-card">
+          <div className="list-head">
+            <h2>Koleksiyon</h2>
+            <p>
+              {kitaplar.length === 0
+                ? "Henüz kitap yok"
+                : `${filtrelenmisKitaplar.length}/${kitaplar.length} kitap listeleniyor`}
+            </p>
+          </div>
+
+          <div className="filter-bar">
+            <input
+              type="text"
+              className="control control-search"
+              placeholder="Kitap veya yazar ara..."
+              value={aramaMetni}
+              onChange={(e) => setAramaMetni(e.target.value)}
+            />
+
+            <select
+              className="control control-compact"
+              value={yazarFiltresi}
+              onChange={(e) => setYazarFiltresi(e.target.value)}
+            >
+              <option value="hepsi">Tüm yazarlar</option>
+              {yazarlar.map((yazar) => (
+                <option key={yazar} value={yazar}>
+                  {yazar}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="control control-compact"
+              value={durumFiltresi}
+              onChange={(e) => setDurumFiltresi(e.target.value)}
+            >
+              <option value="hepsi">Tüm durumlar</option>
+              <option value="okundu">Sadece okundu</option>
+              <option value="okunmadı">Sadece okunmadı</option>
+            </select>
+
+            <select className="control control-compact" value={siralama} onChange={(e) => setSiralama(e.target.value)}>
+              <option value="yazar-az">Yazar (A-Z)</option>
+              <option value="yazar-za">Yazar (Z-A)</option>
+              <option value="kitap-az">Kitap (A-Z)</option>
+              <option value="kitap-za">Kitap (Z-A)</option>
+            </select>
+
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setAramaMetni("");
+                setDurumFiltresi("hepsi");
+                setYazarFiltresi("hepsi");
+                setSiralama("yazar-az");
+              }}
+            >
+              Temizle
+            </button>
+          </div>
+
+          <div className={`list-box ${azSonucDekoruGoster ? "sparse" : ""}`}>
+            {kitaplar.length === 0 && (
+              <div className="empty-state">İlk kitabı ekleyerek kütüphaneni oluştur.</div>
+            )}
+            {kitaplar.length > 0 && filtrelenmisKitaplar.length === 0 && (
+              <div className="empty-state">Filtreye uygun kitap bulunamadı.</div>
+            )}
+            {filtrelenmisKitaplar.map((kitap) => {
               const isSelected = secilenId === kitap.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={kitap.id}
                   onClick={() => kitapSec(kitap)}
-                  style={{
-                    ...styles.listItem,
-                    backgroundColor: isSelected ? "#0078d7" : "transparent",
-                    color: isSelected ? "#ffffff" : "#000000",
-                  }}
+                  className={`list-item ${isSelected ? "selected" : ""}`}
                 >
-                  {kitap.yazar_ad_soyad} - {kitap.kitap_ad} [{kitap.okundu_mu ? "Okundu" : "Okunmadı"}]
-                </div>
+                  <span className="item-title">{kitap.kitap_ad}</span>
+                  <span className="item-meta">{kitap.yazar_ad_soyad}</span>
+                  <span className={`item-badge ${kitap.okundu_mu ? "done" : "pending"}`}>
+                    {kitap.okundu_mu ? "Okundu" : "Okunmadı"}
+                  </span>
+                </button>
               );
             })}
+            {azSonucDekoruGoster && <div className="shelf-illustration" aria-hidden="true" />}
           </div>
-        </div>
+        </section>
 
-        {/* ✏️ 3. Panel: Güncelleme Paneli (Yalnızca seçim varsa görünür) */}
         {secilenId && (
-          <div style={{ ...styles.panel, borderLeft: "1px solid #ccc", paddingLeft: "20px" }}>
+          <section className="card form-card update-card">
+            <h2>Seçili Kitabı Güncelle</h2>
             <form onSubmit={kitapGuncelle}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Kitap İsmi</label>
+              <div className="form-group">
+                <label className="label">Kitap İsmi</label>
                 <input
                   type="text"
                   value={guncelKitapAd}
                   onChange={(e) => setGuncelKitapAd(e.target.value)}
-                  style={styles.input}
+                  className="control"
                   required
                 />
               </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Yazar İsmi</label>
+              <div className="form-group">
+                <label className="label">Yazar İsmi</label>
                 <input
                   type="text"
                   value={guncelYazarAdSoyad}
                   onChange={(e) => setGuncelYazarAdSoyad(e.target.value)}
-                  style={styles.input}
+                  className="control"
                   required
                 />
               </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Durum</label>
+              <div className="form-group">
+                <label className="label">Durum</label>
                 <select
                   value={guncelOkunduMu ? "true" : "false"}
                   onChange={(e) => setGuncelOkunduMu(e.target.value === "true")}
-                  style={styles.select}
+                  className="control"
                 >
                   <option value="false">Okunmadı</option>
                   <option value="true">Okundu</option>
                 </select>
               </div>
-              <div style={styles.buttonGroup}>
-                <button
-                  type="submit"
-                  style={getButtonStyle("guncelle")}
-                  onMouseEnter={() => setHoveredButton("guncelle")}
-                  onMouseLeave={() => {
-                    setHoveredButton(null);
-                    setPressedButton(null);
-                  }}
-                  onMouseDown={() => setPressedButton("guncelle")}
-                  onMouseUp={() => setPressedButton(null)}
-                >
+              <div className="button-group single">
+                <button type="submit" className="btn btn-primary">
                   Güncelle
                 </button>
               </div>
             </form>
-          </div>
+          </section>
         )}
       </div>
     </div>
   );
 }
-
-const styles = {
-  windowContainer: {
-    height: "700px",
-    margin: "30px auto",
-    border: "2px solid #999",
-    borderRadius: "1px",
-    backgroundColor: "#f0f0f0",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-    fontFamily: "Segoe UI, sans-serif",
-    transition: "width 0.2s ease",
-  },
-  titleBar: {
-    backgroundColor: "#ffffff",
-    padding: "8px 12px",
-    borderBottom: "2px solid #ddd",
-    fontWeight: "bold",
-    fontSize: "16px",
-  },
-  content: {
-    display: "flex",
-    padding: "20px",
-    gap: "20px",
-  },
-  panel: {
-    flex: "1",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-  },
-  listPanel: {
-    flex: "1.4",
-  },
-  formGroup: {
-    marginBottom: "35px",
-  },
-  label: {
-    display: "block",
-    fontSize: "22px",
-    marginBottom: "8px",
-    color: "#222",
-  },
-  input: {
-    width: "100%",
-    padding: "12px 14px",
-    fontSize: "20px",
-    border: "1px solid #7a7a7a",
-    backgroundColor: "#ffffff",
-    color: "#000000",
-    boxSizing: "border-box",
-  },
-  select: {
-    width: "100%",
-    padding: "12px 14px",
-    fontSize: "22px",
-    border: "1px solid #7a7a7a",
-    backgroundColor: "#ffffff",
-    color: "#000000",
-    boxSizing: "border-box",
-  },
-  buttonGroup: {
-    display: "flex",
-    gap: "10px",
-    marginTop: "10px",
-  },
-  button: {
-    flex: "1",
-    padding: "12px 0",
-    fontSize: "22px",
-    cursor: "pointer",
-    background: "linear-gradient(180deg, #f8f8f8 0%, #e1e1e1 100%)",
-    color: "#000000",
-    border: "1px solid #7a7a7a",
-    borderRadius: "2px",
-    transition: "all 0.18s ease",
-    userSelect: "none",
-  },
-  counterText: {
-    fontSize: "24px",
-    marginTop: "125px",
-    color: "#111",
-  },
-  listBox: {
-    height: "600px",
-    border: "1px solid #7a7a7a",
-    backgroundColor: "#ffffff",
-    overflowY: "scroll",
-    padding: "1px",
-  },
-  listItem: {
-    padding: "12px 14px",
-    fontSize: "22px",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  },
-};
 
 export default App;
