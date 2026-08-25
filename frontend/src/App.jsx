@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 
 function App() {
   const [kitaplar, setKitaplar] = useState([]);
+  const [hoveredButton, setHoveredButton] = useState(null);
+  const [pressedButton, setPressedButton] = useState(null);
   
   // 📥 Sol Panel: Ekleme form state'leri
   const [kitapAd, setKitapAd] = useState("");
@@ -98,8 +100,29 @@ function App() {
       .catch((err) => console.error("Silme hatası:", err));
   };
 
+  const getButtonStyle = (buttonKey) => {
+    const isHovered = hoveredButton === buttonKey;
+    const isPressed = pressedButton === buttonKey;
+
+    return {
+      ...styles.button,
+      background: isPressed
+        ? "linear-gradient(180deg, #d6d6d6 0%, #c4c4c4 100%)"
+        : isHovered
+        ? "linear-gradient(180deg, #ffffff 0%, #e8eefc 100%)"
+        : "linear-gradient(180deg, #f8f8f8 0%, #e1e1e1 100%)",
+      borderColor: isHovered ? "#3a78d0" : "#7a7a7a",
+      boxShadow: isPressed
+        ? "inset 0 2px 4px rgba(0,0,0,0.18)"
+        : isHovered
+        ? "0 6px 14px rgba(58, 120, 208, 0.25)"
+        : "0 2px 4px rgba(0,0,0,0.08)",
+      transform: isPressed ? "translateY(1px) scale(0.99)" : isHovered ? "translateY(-1px)" : "none",
+    };
+  };
+
   return (
-    <div style={{ ...styles.windowContainer, width: secilenId ? "1600px" : "1200px" }}>
+    <div style={{ ...styles.windowContainer, width: secilenId ? "1750px" : "1300px" }}>
       <div style={styles.titleBar}>
         <span>📚 Kütüphanem</span>
       </div>
@@ -140,8 +163,57 @@ function App() {
               </select>
             </div>
             <div style={styles.buttonGroup}>
-              <button type="submit" style={styles.button}>Ekle</button>
-              <button type="button" onClick={kitapSil} style={styles.button}>Sil</button>
+              <button
+                type="submit"
+                style={getButtonStyle("ekle")}
+                onMouseEnter={() => setHoveredButton("ekle")}
+                onMouseLeave={() => {
+                  setHoveredButton(null);
+                  setPressedButton(null);
+                }}
+                onMouseDown={() => setPressedButton("ekle")}
+                onMouseUp={() => setPressedButton(null)}
+              >
+                Ekle
+              </button>
+              <button
+                type="button"
+                onClick={kitapSil}
+                style={getButtonStyle("sil")}
+                onMouseEnter={() => setHoveredButton("sil")}
+                onMouseLeave={() => {
+                  setHoveredButton(null);
+                  setPressedButton(null);
+                }}
+                onMouseDown={() => setPressedButton("sil")}
+                onMouseUp={() => setPressedButton(null)}
+              >
+                Sil
+              </button>
+              <button
+                type="button"
+                style={getButtonStyle("indir")}
+                onMouseEnter={() => setHoveredButton("indir")}
+                onMouseLeave={() => {
+                  setHoveredButton(null);
+                  setPressedButton(null);
+                }}
+                onMouseDown={() => setPressedButton("indir")}
+                onMouseUp={() => setPressedButton(null)}
+                onClick={() => {
+                  const dataStr =
+                    "data:text/json;charset=utf-8," +
+                    encodeURIComponent(JSON.stringify(kitaplar, null, 2));
+                  const downloadAnchorNode = document.createElement("a");
+                  downloadAnchorNode.setAttribute("href", dataStr);
+                  downloadAnchorNode.setAttribute("download", "kitaplar.json");
+                  document.body.appendChild(downloadAnchorNode);
+                  downloadAnchorNode.click();
+                  downloadAnchorNode.remove();
+                }}
+              >
+                Listeyi İndir
+              </button>
             </div>
           </form>
           <div style={styles.counterText}>Kitap Sayısı: {kitaplar.length}</div>
@@ -205,7 +277,19 @@ function App() {
                 </select>
               </div>
               <div style={styles.buttonGroup}>
-                <button type="submit" style={styles.button}>Güncelle</button>
+                <button
+                  type="submit"
+                  style={getButtonStyle("guncelle")}
+                  onMouseEnter={() => setHoveredButton("guncelle")}
+                  onMouseLeave={() => {
+                    setHoveredButton(null);
+                    setPressedButton(null);
+                  }}
+                  onMouseDown={() => setPressedButton("guncelle")}
+                  onMouseUp={() => setPressedButton(null)}
+                >
+                  Güncelle
+                </button>
               </div>
             </form>
           </div>
@@ -284,10 +368,12 @@ const styles = {
     padding: "12px 0",
     fontSize: "22px",
     cursor: "pointer",
-    backgroundColor: "#e1e1e1",
+    background: "linear-gradient(180deg, #f8f8f8 0%, #e1e1e1 100%)",
     color: "#000000",
     border: "1px solid #7a7a7a",
     borderRadius: "2px",
+    transition: "all 0.18s ease",
+    userSelect: "none",
   },
   counterText: {
     fontSize: "24px",
