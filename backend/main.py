@@ -35,6 +35,14 @@ def get_db():
     finally:
         db.close()
 
+@app.get("/")
+def api_karsilama():
+    return {
+        "mesaj": "Kütüphane API çalışıyor.",
+        "dokumantasyon": "/docs",
+        "kitaplar": "/kitaplar",
+    }
+
 # -----------------------------------------
 # CREATE - Yeni Kitap Ekle
 # -----------------------------------------
