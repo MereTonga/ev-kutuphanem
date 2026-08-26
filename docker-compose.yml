@@ -1,0 +1,62 @@
+services:
+  # 1. VERİTABANI SERVİSİ
+  db:
+    image: postgres:18-alpine
+    container_name: kutuphane_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      # Dışarıdan (örn. DBeaver/pgAdmin ile) bağlanmak istersen 5432 portunu açıyoruz
+      - "${DB_PORT}:5432"
+    volumes:
+      # Konteynır silinse/kapansa bile verilerin kaybolmaması için kalıcı disk alanı
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  # 2. BACKEND SERVİSİ
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kutuphane_backend
+    restart: always
+    # Backend'deki kodu değiştirdiğinde anında yansıması (Hot Reload) için:
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+    # DB sadece ayağa kalkmasın, tamamen hazır (healthy) olana kadar beklesin:  
+    depends_on:
+      db:
+        condition: service_healthy
+    # Geliştirme esnasında hot-reload için uvicorn komutunu override ediyoruz:
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # 3. FRONTEND SERVİSİ
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kutuphane_frontend
+    restart: always
+    # Frontend kodunu değiştirdiğinde anında yansıması için:
+    volumes:
+      - ./frontend:/app
+      # Konteynır içindeki node_modules'ın yereldekiyle ezilmemesi için:
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
