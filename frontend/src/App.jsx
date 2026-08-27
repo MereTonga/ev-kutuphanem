@@ -12,6 +12,8 @@ function App() {
   const [iceAktarmaDurumu, setIceAktarmaDurumu] = useState("");
   const [iceAktariliyor, setIceAktariliyor] = useState(false);
   const dosyaInputRef = useRef(null);
+  const [secilenIdler, setSecilenIdler] = useState([]);
+  const [secimBaslangicId, setSecimBaslangicId] = useState(null);
 
   // Sol Panel: Ekleme form state'leri
   const [kitapAd, setKitapAd] = useState("");
@@ -19,7 +21,6 @@ function App() {
   const [okunduMu, setOkunduMu] = useState(false);
 
   // Secili kitap ve Sag Panel: Guncelleme state'leri
-  const [secilenId, setSecilenId] = useState(null);
   const [guncelKitapAd, setGuncelKitapAd] = useState("");
   const [guncelYazarAdSoyad, setGuncelYazarAdSoyad] = useState("");
   const [guncelOkunduMu, setGuncelOkunduMu] = useState(false);
@@ -27,21 +28,76 @@ function App() {
   // Kitaplari getir
   const kitaplariGetir = () => {
     return fetch("http://localhost:8000/kitaplar")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Kitap listesi alınamadı.");
+        return res.json();
+      })
       .then((data) => setKitaplar(data))
-      .catch((err) => console.error("Hata:", err));
+      .catch((err) => {
+        console.error("Hata:", err);
+        throw err;
+      });
   };
 
   useEffect(() => {
     kitaplariGetir();
   }, []);
 
-  // 📋 Listeden Kitap Seçme
-  const kitapSec = (kitap) => {
-    setSecilenId(kitap.id);
+  const seciliKitap = kitaplar.find((kitap) => kitap.id === secilenIdler[0]);
+
+  const guncellemePaneliniDoldur = (kitap) => {
+    if (!kitap) return;
     setGuncelKitapAd(kitap.kitap_ad);
     setGuncelYazarAdSoyad(kitap.yazar_ad_soyad);
     setGuncelOkunduMu(kitap.okundu_mu);
+  };
+
+  // Normal tik tek secim, Ctrl/Cmd ekle-cikar, Shift aralik secimi yapar.
+  const kitapSec = (kitap, e) => {
+    const gorunenIndex = filtrelenmisKitaplar.findIndex((listeKitabi) => listeKitabi.id === kitap.id);
+    const komutTiklamasi = e.ctrlKey || e.metaKey;
+    const aralikTiklamasi = e.shiftKey && secimBaslangicId !== null;
+
+    if (aralikTiklamasi) {
+      const baslangicIndex = filtrelenmisKitaplar.findIndex((listeKitabi) => listeKitabi.id === secimBaslangicId);
+      if (baslangicIndex < 0 || gorunenIndex < 0) {
+        setSecilenIdler([kitap.id]);
+        setSecimBaslangicId(kitap.id);
+        guncellemePaneliniDoldur(kitap);
+        return;
+      }
+      const aralikBaslangici = Math.min(baslangicIndex, gorunenIndex);
+      const aralikSonu = Math.max(baslangicIndex, gorunenIndex);
+      const aralikIdleri = filtrelenmisKitaplar
+        .slice(aralikBaslangici, aralikSonu + 1)
+        .map((listeKitabi) => listeKitabi.id);
+
+      setSecilenIdler((oncekiIdler) => [...new Set([...oncekiIdler, ...aralikIdleri])]);
+      return;
+    }
+
+    if (komutTiklamasi) {
+      const yeniIdler = secilenIdler.includes(kitap.id)
+        ? secilenIdler.filter((id) => id !== kitap.id)
+        : [...secilenIdler, kitap.id];
+
+      setSecilenIdler(yeniIdler);
+      setSecimBaslangicId(kitap.id);
+      guncellemePaneliniDoldur(kitaplar.find((listeKitabi) => listeKitabi.id === yeniIdler[0]));
+      return;
+    }
+
+    if (secilenIdler.includes(kitap.id)) {
+      const yeniIdler = secilenIdler.filter((id) => id !== kitap.id);
+      setSecilenIdler(yeniIdler);
+      setSecimBaslangicId(yeniIdler[0] ?? null);
+      guncellemePaneliniDoldur(kitaplar.find((listeKitabi) => listeKitabi.id === yeniIdler[0]));
+      return;
+    }
+
+    setSecilenIdler([kitap.id]);
+    setSecimBaslangicId(kitap.id);
+    guncellemePaneliniDoldur(kitap);
   };
 
   // Kitap ekle
@@ -71,9 +127,9 @@ function App() {
   // Kitap guncelle
   const kitapGuncelle = (e) => {
     e.preventDefault();
-    if (!secilenId) return;
+    if (!secilenIdler[0]) return;
 
-    fetch(`http://localhost:8000/kitaplar/${secilenId}`, {
+    fetch(`http://localhost:8000/kitaplar/${secilenIdler[0]}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -91,19 +147,23 @@ function App() {
 
   // Kitap sil
   const kitapSil = () => {
-    if (!secilenId) {
+    if (secilenIdler.length === 0) {
       alert("Lütfen önce listeden bir kitap seçin!");
       return;
     }
 
-    fetch(`http://localhost:8000/kitaplar/${secilenId}`, {
-      method: "DELETE",
+    fetch("http://localhost:8000/kitaplar/toplu-sil", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(secilenIdler),
     })
-      .then((res) => {
-        if (res.ok) {
-          kitaplariGetir();
-          setSecilenId(null);
-        }
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Seçili kitaplar silinemedi.");
+        const sonuc = await res.json();
+        await kitaplariGetir();
+        setSecilenIdler([]);
+        setSecimBaslangicId(null);
+        setIceAktarmaDurumu(`${sonuc.silinen} kitap silindi.`);
       })
       .catch((err) => console.error("Silme hatası:", err));
   };
@@ -116,6 +176,26 @@ function App() {
     const downloadAnchorNode = document.createElement("a");
     downloadAnchorNode.setAttribute("href", url);
     downloadAnchorNode.setAttribute("download", "kitaplar.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const secilenKitaplariIndir = () => {
+    if (secilenIdler.length === 0) {
+      alert("Lütfen önce listeden en az bir kitap seçin!");
+      return;
+    }
+
+    const secilenKitaplar = kitaplar.filter((kitap) => secilenIdler.includes(kitap.id));
+    const blob = new Blob([JSON.stringify(secilenKitaplar, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const downloadAnchorNode = document.createElement("a");
+    downloadAnchorNode.setAttribute("href", url);
+    downloadAnchorNode.setAttribute("download", "secilen-kitaplar.json");
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -223,7 +303,7 @@ function App() {
         </div>
       </header>
 
-      <div className={`library-grid ${secilenId ? "has-selection" : ""}`}>
+      <div className={`library-grid ${secilenIdler.length > 0 ? "has-selection" : ""}`}>
         <section className="card form-card">
           <h2>Yeni Kitap Ekle</h2>
           <form onSubmit={kitapEkle}>
@@ -263,7 +343,7 @@ function App() {
                 Ekle
               </button>
               <button type="button" onClick={kitapSil} className="btn btn-danger">
-                Sil
+                {secilenIdler.length > 1 ? `Seçilenleri Sil (${secilenIdler.length})` : "Sil"}
               </button>
               <button type="button" className="btn btn-secondary" onClick={kitaplariIndir}>
                 Listeyi İndir
@@ -275,6 +355,9 @@ function App() {
                 disabled={iceAktariliyor}
               >
                 {iceAktariliyor ? "Aktarılıyor..." : "Listeyi İçeri Aktar"}
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={secilenKitaplariIndir}>
+                Seçilenleri İndir
               </button>
             </div>
           </form>
@@ -360,12 +443,12 @@ function App() {
               <div className="empty-state">Filtreye uygun kitap bulunamadı.</div>
             )}
             {filtrelenmisKitaplar.map((kitap) => {
-              const isSelected = secilenId === kitap.id;
+              const isSelected = secilenIdler.includes(kitap.id);
               return (
                 <button
                   type="button"
                   key={kitap.id}
-                  onClick={() => kitapSec(kitap)}
+                  onClick={(e) => kitapSec(kitap, e)}
                   className={`list-item ${isSelected ? "selected" : ""}`}
                 >
                   <span className="item-title">{kitap.kitap_ad}</span>
@@ -378,9 +461,14 @@ function App() {
             })}
             {azSonucDekoruGoster && <div className="shelf-illustration" aria-hidden="true" />}
           </div>
+          {secilenIdler.length > 0 && (
+            <p className="selection-status">
+              {secilenIdler.length} kitap seçildi. Güncelleme paneli ilk seçilen kitabı gösteriyor.
+            </p>
+          )}
         </section>
 
-        {secilenId && (
+        {secilenIdler.length > 0 && seciliKitap && (
           <section className="card form-card update-card">
             <h2>Seçili Kitabı Güncelle</h2>
             <form onSubmit={kitapGuncelle}>
