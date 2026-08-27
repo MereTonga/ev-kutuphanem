@@ -2,6 +2,8 @@
 
 Kişisel kitap koleksiyonunu yönetmek için geliştirilmiş, Türkçe arayüze sahip full-stack ev kütüphanesi uygulaması. Kitaplar PostgreSQL veritabanında saklanır; React arayüzü üzerinden koleksiyon eklenebilir, güncellenebilir, silinebilir, aranabilir, filtrelenebilir ve JSON olarak yedeklenebilir.
 
+<img width="1887" height="1202" alt="image" src="https://github.com/user-attachments/assets/7cfd0dc2-5a09-4d11-8220-c55ba12f1ebe" />
+
 ## Özellikler
 
 - Kitap adı, yazar ve okundu durumu ile kitap ekleme
