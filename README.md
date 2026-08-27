@@ -281,3 +281,8 @@ Backend’de şu an otomatik test paketi bulunmamaktadır. API davranışı Swag
 - İçe aktarma ve toplu silme durumları arayüzde gösterilir; ekleme ve güncelleme hataları için kullanıcı bildirimleri hâlâ sınırlıdır.
 - `create_all()` eksik tabloları oluşturur, ancak migration sistemi yoktur.
 - Production deployment, CI/CD ve otomatik backend testleri bu projenin mevcut kapsamına dahil değildir.
+
+
+## Lisans
+
+Bu proje MIT Lisansı ile lisanslanmıştır. Ayrıntılar için [LICENSE](LICENSE) dosyasına bakabilirsiniz.
