@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
 const metniNormallestir = (deger) => deger.toLocaleLowerCase("tr-TR").trim();
@@ -9,6 +9,9 @@ function App() {
   const [durumFiltresi, setDurumFiltresi] = useState("hepsi");
   const [yazarFiltresi, setYazarFiltresi] = useState("hepsi");
   const [siralama, setSiralama] = useState("yazar-az");
+  const [iceAktarmaDurumu, setIceAktarmaDurumu] = useState("");
+  const [iceAktariliyor, setIceAktariliyor] = useState(false);
+  const dosyaInputRef = useRef(null);
 
   // Sol Panel: Ekleme form state'leri
   const [kitapAd, setKitapAd] = useState("");
@@ -23,7 +26,7 @@ function App() {
 
   // Kitaplari getir
   const kitaplariGetir = () => {
-    fetch("http://localhost:8000/kitaplar")
+    return fetch("http://localhost:8000/kitaplar")
       .then((res) => res.json())
       .then((data) => setKitaplar(data))
       .catch((err) => console.error("Hata:", err));
@@ -117,6 +120,38 @@ function App() {
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const kitaplariIceAktar = async (e) => {
+    const dosya = e.target.files?.[0];
+    e.target.value = "";
+
+    if (!dosya) return;
+
+    setIceAktariliyor(true);
+    setIceAktarmaDurumu("");
+
+    const formData = new FormData();
+    formData.append("dosya", dosya);
+
+    try {
+      const response = await fetch("http://localhost:8000/kitaplar/import", {
+        method: "POST",
+        body: formData,
+      });
+      const sonuc = await response.json();
+
+      if (!response.ok) {
+        throw new Error(sonuc.detail || "Kitaplar içeri aktarılamadı.");
+      }
+
+      await kitaplariGetir();
+      setIceAktarmaDurumu(`${sonuc.eklenen} kitap eklendi, ${sonuc.atlanan} kayıt zaten vardı.`);
+    } catch (err) {
+      setIceAktarmaDurumu(`İçe aktarma başarısız: ${err.message}`);
+    } finally {
+      setIceAktariliyor(false);
+    }
   };
 
   const okunanSayisi = kitaplar.filter((kitap) => kitap.okundu_mu).length;
@@ -233,9 +268,25 @@ function App() {
               <button type="button" className="btn btn-secondary" onClick={kitaplariIndir}>
                 Listeyi İndir
               </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => dosyaInputRef.current?.click()}
+                disabled={iceAktariliyor}
+              >
+                {iceAktariliyor ? "Aktarılıyor..." : "Listeyi İçeri Aktar"}
+              </button>
             </div>
           </form>
           <p className="counter">Kitap Sayısı: {kitaplar.length}</p>
+          <input
+            ref={dosyaInputRef}
+            className="file-input"
+            type="file"
+            accept=".json,application/json"
+            onChange={kitaplariIceAktar}
+          />
+          {iceAktarmaDurumu && <p className="import-status">{iceAktarmaDurumu}</p>}
         </section>
 
         <section className="card list-card">

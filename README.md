@@ -11,6 +11,7 @@ Kişisel kitap koleksiyonunu yönetmek için hazırlanmış, Türkçe arayüze s
 - Yazar ya da kitap adına göre A-Z / Z-A sıralama
 - Toplam, okunan, okunmayan ve görünür kitap sayılarını gösterme
 - Koleksiyonu `kitaplar.json` olarak dışa aktarma
+- `kitaplar.json` dosyasını Docker PostgreSQL veritabanına içe aktarma
 - Aynı kitap-yazar çiftinin tekrar eklenmesini engelleme
 - Kitap ve yazar adlarında boşluk temizleme ve veri doğrulama
 - Responsive, raf temalı kullanıcı arayüzü
@@ -126,6 +127,7 @@ Frontend varsayılan olarak `http://localhost:5173` adresinde açılır. Uygulam
 3. Seçili kitabı silmek için **Sil** düğmesini kullanın.
 4. Arama kutusu, yazar filtresi, durum filtresi ve sıralama seçenekleriyle listeyi daraltın.
 5. Mevcut koleksiyonu indirmek için **Listeyi İndir** düğmesine basın.
+6. Daha önce dışa aktardığınız bir JSON dosyasını eklemek için **Listeyi İçeri Aktar** düğmesini kullanın. Aynı kitap-yazar kaydı zaten varsa tekrar eklenmez; işlem sonunda eklenen ve atlanan kayıt sayısı gösterilir.
 
 ## API
 
@@ -134,6 +136,7 @@ Frontend varsayılan olarak `http://localhost:5173` adresinde açılır. Uygulam
 | ---------- | ------------------------ | ------------------------------ | ------------------ |
 | `GET`    | `/kitaplar`            | Tüm kitapları listeler     | `200 OK`         |
 | `POST`   | `/kitaplar`            | Yeni kitap ekler             | `201 Created`    |
+| `POST`   | `/kitaplar/import`     | JSON dosyasındaki kitapları ekler | `200 OK`     |
 | `PUT`    | `/kitaplar/{kitap_id}` | Kitap bilgilerini günceller | `200 OK`         |
 | `DELETE` | `/kitaplar/{kitap_id}` | Kitabı siler                | `204 No Content` |
 
@@ -149,6 +152,20 @@ Frontend varsayılan olarak `http://localhost:5173` adresinde açılır. Uygulam
 ```
 
 `kitap_ad` ve `yazar_ad_soyad` boş bırakılamaz. Aynı kitap ve yazar kombinasyonu veritabanında benzersizdir; tekrar ekleme veya güncelleme durumunda API `409 Conflict` döndürür. Var olmayan kitap kimlikleri için `404 Not Found` döndürülür.
+
+### JSON içe aktarma
+
+`POST /kitaplar/import` endpoint'i `multipart/form-data` formatında `dosya` alanı bekler. JSON kök değeri aşağıdaki kitap nesnelerinden oluşan bir liste olmalıdır. `id` alanı varsa dikkate alınmaz; kitap kimliklerini PostgreSQL üretir. Var olan veya aynı dosya içinde tekrarlanan kitap-yazar çiftleri atlanır.
+
+```json
+[
+  {
+    "kitap_ad": "Tutunamayanlar",
+    "yazar_ad_soyad": "Oğuz Atay",
+    "okundu_mu": false
+  }
+]
+```
 
 ## Geliştirme Komutları
 

@@ -1,7 +1,9 @@
-from fastapi import FastAPI, Depends, status, HTTPException
+import json
+from fastapi import FastAPI, Depends, status, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from pydantic import ValidationError
 from typing import List
 
 import models
@@ -93,6 +95,87 @@ def kitap_ekle(kitap: schemas.KitapCreate, db: Session = Depends(get_db)):
 @app.get("/kitaplar", response_model=List[schemas.KitapResponse])
 def kitaplari_getir(db: Session = Depends(get_db)):
     return db.query(models.Kitap).all()
+
+# -----------------------------------------
+# IMPORT - JSON dosyasindan kitap ekle
+# -----------------------------------------
+@app.post("/kitaplar/import")
+async def kitaplari_ice_aktar(dosya: UploadFile = File(...), db: Session = Depends(get_db)):
+    dosya_adi_json = bool(dosya.filename and dosya.filename.lower().endswith(".json"))
+    if dosya.content_type not in {"application/json", "text/json", None} and not dosya_adi_json:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Lütfen yalnızca JSON dosyası yükleyin.",
+        )
+
+    icerik = await dosya.read()
+    if len(icerik) > 5 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="JSON dosyası en fazla 5 MB olabilir.",
+        )
+
+    try:
+        veriler = json.loads(icerik.decode("utf-8-sig"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Geçerli ve UTF-8 kodlamalı bir JSON dosyası yükleyin.",
+        )
+
+    if not isinstance(veriler, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="JSON içeriği kitap nesnelerinden oluşan bir liste olmalıdır.",
+        )
+
+    kitaplar = []
+    for sira, veri in enumerate(veriler, start=1):
+        try:
+            kitaplar.append(schemas.KitapCreate.model_validate(veri))
+        except (ValidationError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"{sira}. kitap geçersiz. kitap_ad, yazar_ad_soyad ve okundu_mu alanlarını kontrol edin.",
+            )
+
+    mevcutlar = {
+        (kitap.kitap_ad, kitap.yazar_ad_soyad)
+        for kitap in db.query(models.Kitap.kitap_ad, models.Kitap.yazar_ad_soyad).all()
+    }
+    eklenecekler = []
+    atlanan_sayisi = 0
+
+    for kitap in kitaplar:
+        anahtar = (kitap.kitap_ad, kitap.yazar_ad_soyad)
+        if anahtar in mevcutlar:
+            atlanan_sayisi += 1
+            continue
+
+        eklenecekler.append(
+            models.Kitap(
+                kitap_ad=kitap.kitap_ad,
+                yazar_ad_soyad=kitap.yazar_ad_soyad,
+                okundu_mu=kitap.okundu_mu,
+            )
+        )
+        mevcutlar.add(anahtar)
+
+    try:
+        db.add_all(eklenecekler)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Dosyadaki kitaplar eklenirken benzersiz kayıt çakışması oluştu.",
+        )
+
+    return {
+        "mesaj": "Kitaplar başarıyla içeri aktarıldı.",
+        "eklenen": len(eklenecekler),
+        "atlanan": atlanan_sayisi,
+    }
 
 # -----------------------------------------
 # DELETE - Kitap Sil

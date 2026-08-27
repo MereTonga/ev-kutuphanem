@@ -175,7 +175,7 @@ body {
 
 .button-group {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-top: 12px;
 }
@@ -200,6 +200,12 @@ body {
 
 .btn:active {
   transform: translateY(1px) scale(0.99);
+}
+
+.btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+  transform: none;
 }
 
 .btn-primary {
@@ -233,6 +239,20 @@ body {
   margin-bottom: 0;
   font-weight: 700;
   color: #3c433f;
+}
+
+.file-input {
+  display: none;
+}
+
+.import-status {
+  margin: 10px 0 0;
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: #eef4ed;
+  color: #315b45;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .list-head {
